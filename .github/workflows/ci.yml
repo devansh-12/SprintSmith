@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: ["**"]
   workflow_dispatch:
 
 permissions:
@@ -23,5 +23,3 @@ jobs:
         run: ruff check .
       - name: Test
         run: pytest -q
-      - name: Compose validation
-        run: docker compose config

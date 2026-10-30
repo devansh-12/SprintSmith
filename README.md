@@ -1,4 +1,4 @@
-# SprintSmith
+# SprintSmith v2
 
 Provider-neutral enterprise search and RAG platform. The current foundation is
 Dockerized, observable, and ready for the ingestion and hybrid retrieval slices.
@@ -165,33 +165,34 @@ Local Docker is the development and integration environment, not the public
 hosting target. The production shape is:
 
 ```text
-frontend hosting -> Cloudflare DNS/proxy -> public container host
-									  -> backend-core API
-									  -> AI engine
-									  -> managed PostgreSQL/pgvector
+frontend hosting -> Cloudflare DNS/proxy -> GCE VM (Caddy HTTPS)
+                                      -> backend-core API
+                                      -> private AI engine
+                                      -> private PostgreSQL/pgvector
 ```
 
-Cloudflare DNS should point a dedicated API hostname such as
-`api.rajmathuria.me` to the selected container host. Do not change
-`portfolio.rajmathuria.me`. Cloudflare cannot run this arbitrary Docker Compose
-stack by itself; it provides DNS/proxy/TLS while the containers run on a
-Docker-capable host. A free-tier container host or a small always-on VM must be
-selected after checking current limits, persistent storage, outbound model
-costs, and billing requirements.
+The GCP deployment uses `sprintsmith-api.rajmathuria.me` for the backend API
+and `app.rajmathuria.me` for the frontend. Keep any existing
+`api.rajmathuria.me` service and `portfolio.rajmathuria.me` unchanged. Point
+the SprintSmith API hostname at the GCE VM's reserved external IP and add the
+frontend hostname as a Cloudflare Worker custom domain. Cloudflare provides
+DNS/proxy while Caddy on the VM terminates HTTPS and renews the origin
+certificate. The database and AI engine are not exposed publicly.
 
-Before public deployment, provide access through the normal secret mechanisms:
-GitHub Actions repository administration, Cloudflare DNS/API token, selected
-cloud account/region, and rotated model/database credentials. No credentials
-belong in this repository.
+Deploy from an authenticated Google Cloud CLI session with:
+
+```bash
+bash infra/deploy/deploy-gcp.sh
+```
+
+Application secrets remain in `/opt/sprintsmith/.env` on the VM and are never
+uploaded with the Cloud Build source. No credentials belong in this repository.
 
 The complete deployment runbook is in [docs/deployment.md](docs/deployment.md).
-The production workflow is `.github/workflows/deploy.yml`; it builds backend
-images with GCP Cloud Build, publishes them to Artifact Registry, deploys the
-backend to a Docker VM over SSH, and deploys the frontend to Cloudflare Workers.
-
-Backend deployment is currently opt-in. Set the production variable
-`BACKEND_DEPLOY_ENABLED=true` only after the backend VM and SSH secrets are
-ready; frontend deployment does not depend on the backend deployment.
+The five GitHub Actions workflows all start on every push. The production
+workflow runs deployment jobs only on `main`, uses GitHub OIDC
+Workload Identity Federation to build and deploy through GCP, and deploys the
+frontend after the backend when `DEPLOY_FRONTEND=true`.
 
 ## Local checks
 
@@ -203,13 +204,14 @@ docker compose config
 git diff --check
 ```
 
-The GitHub Actions workflow runs the same core checks on pushes to `main` and
-on pull requests. View results at the repository's GitHub Actions page:
+The GitHub Actions workflows run on every push and on pull requests. View
+results at the repository's GitHub Actions page:
 [github.com/CodeCraftsmanRaj/SprintSmith/actions](https://github.com/CodeCraftsmanRaj/SprintSmith/actions).
 
-The `Full Stack Platform` workflow runs root unit tests, validates both Compose
-profiles, starts the platform services, and runs the API smoke test. The
-backend-core and AI-engine workflows run their dedicated suites separately.
+The `CI` workflow owns root unit tests and linting. The `Full Stack Platform`
+workflow validates Compose, starts the platform services, and runs the API
+smoke test. The backend-core and AI-engine workflows run their dedicated
+suites separately.
 
 The root workflows also run the integrated backend-core suites when their
 paths change:
@@ -237,8 +239,7 @@ empty result list. The following production features are intentionally next:
 3. PostgreSQL full-text retrieval plus `pgvector` semantic retrieval.
 4. Reciprocal-rank fusion, citations, retrieval evaluation, and regression gates.
 5. Authentication, tenant isolation, rate limits, retention, backups, and alerts.
-6. Complete the GCP project IAM, GitHub Workload Identity Federation, and VM
-   prerequisites documented in `docs/gcp-setup-for-owner.md`.
+6. Cloud deployment through GitHub OIDC after the free-tier runtime is selected.
 
 No cloud credentials or DNS changes are required for the current local stack.
 The existing `portfolio.rajmathuria.me` host is not changed by this project.

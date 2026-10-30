@@ -2,22 +2,18 @@ name: Production Deployment
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  GCP_PROJECT_ID: major-project-512815
-  GCP_REGION: us-central1
-  IMAGE_NAMESPACE: us-central1-docker.pkg.dev/major-project-512815/sprintsmith-repo
-
 jobs:
-  publish-backend:
-    name: Build and publish backend images
-    if: vars.BACKEND_DEPLOY_ENABLED == 'true'
+  deploy-backend:
+    name: Build and deploy backend to GCP
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: read
       id-token: write
@@ -26,62 +22,19 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          workload_identity_provider: projects/833405754913/locations/global/workloadIdentityPools/sprintsmith-github/providers/github
           service_account: sprintsmith-github-deploy@major-project-512815.iam.gserviceaccount.com
-      - name: Set up gcloud
+      - name: Set up Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ env.GCP_PROJECT_ID }}
-      - name: Submit Cloud Build
-        run: |
-          gcloud builds submit \
-            --project "$GCP_PROJECT_ID" \
-            --region "$GCP_REGION" \
-            --config infra/gcp/cloudbuild.yaml \
-            --substitutions="_IMAGE_NAMESPACE=${IMAGE_NAMESPACE},_IMAGE_TAG=${GITHUB_SHA}" \
-            .
-
-  deploy-backend:
-    name: Deploy backend VM
-    if: vars.BACKEND_DEPLOY_ENABLED == 'true'
-    needs: publish-backend
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install deployment files
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.BACKEND_HOST }}
-          username: ${{ secrets.BACKEND_USER }}
-          key: ${{ secrets.BACKEND_SSH_KEY }}
-          source: "infra/deploy/compose.production.yaml"
-          target: "/opt/sprintsmith"
-      - name: Restart backend stack
-        uses: appleboy/ssh-action@v1
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-          IMAGE_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
-        with:
-          host: ${{ secrets.BACKEND_HOST }}
-          username: ${{ secrets.BACKEND_USER }}
-          key: ${{ secrets.BACKEND_SSH_KEY }}
-          envs: IMAGE_TAG,IMAGE_NAMESPACE
-          script: |
-            cd /opt/sprintsmith
-            mkdir -p infra/deploy
-            mv -f compose.production.yaml infra/deploy/compose.production.yaml
-            test -f infra/deploy/compose.production.yaml
-            sed -i "s#^BACKEND_IMAGE=.*#BACKEND_IMAGE=${IMAGE_NAMESPACE}/sprintsmith-backend-core:${IMAGE_TAG}#" .env
-            sed -i "s#^AI_ENGINE_IMAGE=.*#AI_ENGINE_IMAGE=${IMAGE_NAMESPACE}/sprintsmith-ai-engine:${IMAGE_TAG}#" .env
-            gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-            docker compose --env-file .env -f infra/deploy/compose.production.yaml pull
-            docker compose --env-file .env -f infra/deploy/compose.production.yaml up -d
-            curl --fail --retry 10 --retry-delay 5 http://localhost:8002/health
+          project_id: major-project-512815
+      - name: Build and deploy backend
+        run: bash infra/deploy/deploy-gcp.sh
 
   deploy-frontend:
-    name: Deploy frontend to Cloudflare
-    if: vars.DEPLOY_FRONTEND == 'true'
+    name: Deploy frontend to Cloudflare Workers
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_FRONTEND == 'true'
+    needs: deploy-backend
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -97,7 +50,7 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         env:
-          VITE_API_URL: ${{ vars.PUBLIC_API_URL }}
+          VITE_API_URL: https://sprintsmith-api.rajmathuria.me
         run: npm run build
       - name: Deploy Cloudflare Worker
         working-directory: frontend

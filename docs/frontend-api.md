@@ -8,9 +8,8 @@ docker compose --profile core up -d --build
 ```
 
 In production this should be
-the dedicated API hostname, such as `https://api.rajmathuria.me`. The AI engine
-at port `8001` is an internal service and should not be called directly by the
-browser.
+`https://sprintsmith-api.rajmathuria.me`. The AI engine at port `8001` is an
+internal service and should not be called directly by the browser.
 
 All protected routes use `Authorization: Bearer <access_token>`.
 

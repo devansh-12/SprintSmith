@@ -7,6 +7,12 @@
     "directory": ".output/public",
     "binding": "ASSETS"
   },
+  "routes": [
+    {
+      "pattern": "app.rajmathuria.me",
+      "custom_domain": true
+    }
+  ],
   "observability": {
     "enabled": true
   }

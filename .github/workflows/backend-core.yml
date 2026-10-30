@@ -2,7 +2,7 @@ name: DevPilot Backend Core
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
     paths:
       - "backend-core/backend/**"

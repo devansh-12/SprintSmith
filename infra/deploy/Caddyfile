@@ -1,0 +1,4 @@
+sprintsmith-api.rajmathuria.me {
+	encode zstd gzip
+	reverse_proxy backend-core:8000
+}

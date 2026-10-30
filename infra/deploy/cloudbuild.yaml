@@ -1,0 +1,26 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/sprintsmith-backend-core:${_TAG}
+      - --file
+      - backend-core/backend/Dockerfile
+      - backend-core/backend
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/sprintsmith-ai-engine:${_TAG}
+      - --file
+      - backend-core/ai-engine/Dockerfile
+      - backend-core/ai-engine
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/sprintsmith-backend-core:${_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/sprintsmith-ai-engine:${_TAG}
+options:
+  logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: devpilot-repo
+  _TAG: manual

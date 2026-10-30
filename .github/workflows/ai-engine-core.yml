@@ -2,7 +2,7 @@ name: DevPilot AI Engine
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
     paths:
       - "backend-core/ai-engine/**"

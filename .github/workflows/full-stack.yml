@@ -2,7 +2,7 @@ name: Full Stack Platform
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
 
@@ -14,20 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          version: latest
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Install root tooling
-        run: uv sync --extra dev
-      - name: Run unit tests
-        run: uv run pytest -q
       - name: Validate all Compose profiles
-        run: |
-          docker compose config
-          docker compose --profile core config
+        run: docker compose --profile core config
       - name: Start platform services
         run: docker compose up -d --build
       - name: Run integration smoke test

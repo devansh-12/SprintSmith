@@ -50,7 +50,7 @@ services:
       AUTO_CREATE_TABLES: "false"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
-      - "8002:8000"
+      - "127.0.0.1:8002:8000"
     volumes:
       - core_uploads:/shared/uploads
     depends_on:
@@ -64,6 +64,22 @@ services:
       timeout: 5s
       retries: 10
 
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend-core:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   core_uploads:
+  caddy_data:
+  caddy_config:
