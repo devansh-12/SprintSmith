@@ -1,0 +1,16 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_IMAGE_NAMESPACE}/sprintsmith-backend-core:${_IMAGE_TAG}
+      - backend-core/backend
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_IMAGE_NAMESPACE}/sprintsmith-ai-engine:${_IMAGE_TAG}
+      - backend-core/ai-engine
+images:
+  - ${_IMAGE_NAMESPACE}/sprintsmith-backend-core:${_IMAGE_TAG}
+  - ${_IMAGE_NAMESPACE}/sprintsmith-ai-engine:${_IMAGE_TAG}

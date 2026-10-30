@@ -185,9 +185,9 @@ cloud account/region, and rotated model/database credentials. No credentials
 belong in this repository.
 
 The complete deployment runbook is in [docs/deployment.md](docs/deployment.md).
-The production workflow is `.github/workflows/deploy.yml`; it publishes images
-to GHCR, deploys the backend to a Docker VM, and deploys the frontend to
-Cloudflare Workers.
+The production workflow is `.github/workflows/deploy.yml`; it builds backend
+images with GCP Cloud Build, publishes them to Artifact Registry, deploys the
+backend to a Docker VM over SSH, and deploys the frontend to Cloudflare Workers.
 
 Backend deployment is currently opt-in. Set the production variable
 `BACKEND_DEPLOY_ENABLED=true` only after the backend VM and SSH secrets are
@@ -237,7 +237,8 @@ empty result list. The following production features are intentionally next:
 3. PostgreSQL full-text retrieval plus `pgvector` semantic retrieval.
 4. Reciprocal-rank fusion, citations, retrieval evaluation, and regression gates.
 5. Authentication, tenant isolation, rate limits, retention, backups, and alerts.
-6. Cloud deployment through GitHub OIDC after the free-tier runtime is selected.
+6. Complete the GCP project IAM, GitHub Workload Identity Federation, and VM
+   prerequisites documented in `docs/gcp-setup-for-owner.md`.
 
 No cloud credentials or DNS changes are required for the current local stack.
 The existing `portfolio.rajmathuria.me` host is not changed by this project.

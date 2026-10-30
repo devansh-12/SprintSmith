@@ -7,50 +7,39 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: ghcr.io/devansh-12
+  GCP_PROJECT_ID: major-project-512815
+  GCP_REGION: us-central1
+  IMAGE_NAMESPACE: us-central1-docker.pkg.dev/major-project-512815/sprintsmith-repo
 
 jobs:
   publish-backend:
-    name: Publish backend images
+    name: Build and publish backend images
     if: vars.BACKEND_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
-        id: meta-backend
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: sprintsmith-github-deploy@major-project-512815.iam.gserviceaccount.com
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
         with:
-          images: ${{ env.IMAGE_NAMESPACE }}/sprintsmith-backend-core
-          tags: |
-            type=raw,value=main
-            type=sha
-      - uses: docker/build-push-action@v6
-        with:
-          context: backend-core/backend
-          push: true
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
-      - uses: docker/metadata-action@v5
-        id: meta-ai
-        with:
-          images: ${{ env.IMAGE_NAMESPACE }}/sprintsmith-ai-engine
-          tags: |
-            type=raw,value=main
-            type=sha
-      - uses: docker/build-push-action@v6
-        with:
-          context: backend-core/ai-engine
-          push: true
-          tags: ${{ steps.meta-ai.outputs.tags }}
-          labels: ${{ steps.meta-ai.outputs.labels }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      - name: Submit Cloud Build
+        run: |
+          gcloud builds submit \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --config infra/gcp/cloudbuild.yaml \
+            --substitutions="_IMAGE_NAMESPACE=${IMAGE_NAMESPACE},_IMAGE_TAG=${GITHUB_SHA}" \
+            .
 
   deploy-backend:
     name: Deploy backend VM
@@ -73,13 +62,11 @@ jobs:
         env:
           IMAGE_TAG: ${{ github.sha }}
           IMAGE_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
-          GHCR_READ_USER: ${{ secrets.GHCR_READ_USER }}
-          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         with:
           host: ${{ secrets.BACKEND_HOST }}
           username: ${{ secrets.BACKEND_USER }}
           key: ${{ secrets.BACKEND_SSH_KEY }}
-          envs: IMAGE_TAG,IMAGE_NAMESPACE,GHCR_READ_USER,GHCR_READ_TOKEN
+          envs: IMAGE_TAG,IMAGE_NAMESPACE
           script: |
             cd /opt/sprintsmith
             mkdir -p infra/deploy
@@ -87,7 +74,7 @@ jobs:
             test -f infra/deploy/compose.production.yaml
             sed -i "s#^BACKEND_IMAGE=.*#BACKEND_IMAGE=${IMAGE_NAMESPACE}/sprintsmith-backend-core:${IMAGE_TAG}#" .env
             sed -i "s#^AI_ENGINE_IMAGE=.*#AI_ENGINE_IMAGE=${IMAGE_NAMESPACE}/sprintsmith-ai-engine:${IMAGE_TAG}#" .env
-            echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_READ_USER" --password-stdin
+            gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
             docker compose --env-file .env -f infra/deploy/compose.production.yaml pull
             docker compose --env-file .env -f infra/deploy/compose.production.yaml up -d
             curl --fail --retry 10 --retry-delay 5 http://localhost:8002/health
